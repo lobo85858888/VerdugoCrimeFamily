@@ -3,17 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VCF - Inicio</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Registro de Transacciones</title>
+    <script type="module">
+        // Importa las funciones necesarias del SDK de Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+        import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
+
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyApGshIyzDs65kdUOM8pFC6I3wbRWHdI2g",
+            authDomain: "verdugo-crime-family.firebaseapp.com",
+            databaseURL: "https://verdugo-crime-family-default-rtdb.firebaseio.com",
+            projectId: "verdugo-crime-family",
+            storageBucket: "verdugo-crime-family.appspot.com",
+            messagingSenderId: "998047686059",
+            appId: "1:998047686059:web:7718c1312960c1e6f206ee",
+            measurementId: "G-9VCT40M5DS"
+        };
+
+        // Inicializa Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const auth = getAuth(app);
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const savePaymentButton = document.getElementById('savePaymentButton');
+            const saveWeaponButton = document.getElementById('saveWeaponButton');
+            const registerButton = document.getElementById('registerButton');
+            const loginButton = document.getElementById('loginButton');
+            const logoutButton = document.getElementById('logoutButton');
+
+            registerButton.addEventListener('click', () => {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                createUserWithEmailAndPassword(auth, email, password)
+                    .then((userCredential) => {
+                        console.log('User registered:', userCredential.user);
+                    })
+                    .catch((error) => {
+                        console.error('Error registering user:', error);
+                    });
+            });
+
+            loginButton.addEventListener('click', () => {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                signInWithEmailAndPassword(auth, email, password)
+                    .then((userCredential) => {
+                        console.log('User logged in:', userCredential.user);
+                    })
+                    .catch((error) => {
+                        console.error('Error logging in user:', error);
+                    });
+            });
+
+            logoutButton.addEventListener('click', () => {
+                auth.signOut().then(() => {
+                    console.log('User logged out');
+                });
+            });
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    console.log('User is signed in:', user);
+                    document.getElementById('authStatus').textContent = 'Logged in';
+                    // Show/hide elements based on authentication state
+                    document.getElementById('authButtons').style.display = 'none';
+                    document.getElementById('logoutButton').style.display = 'block';
+                } else {
+                    console.log('No user is signed in');
+                    document.getElementById('authStatus').textContent = 'Logged out';
+                    // Show/hide elements based on authentication state
+                    document.getElementById('authButtons').style.display = 'block';
+                    document.getElementById('logoutButton').style.display = 'none';
+                }
+            });
+
+            if (savePaymentButton) {
+                savePaymentButton.addEventListener('click', function () {
+                    const recipient = document.getElementById('recipient').value.trim();
+                    const amount = document.getElementById('amount').value.trim();
+                    if (recipient !== "" && amount !== "") {
+                        saveTransaction({ type: 'payment', recipient, amount });
+                        document.getElementById('recipient').value = '';
+                        document.getElementById('amount').value = '';
+                    } else {
+                        alert("Por favor, completa todos los campos de pago.");
+                    }
+                });
+            }
+
+            if (saveWeaponButton) {
+                saveWeaponButton.addEventListener('click', function () {
+                    const weapon = document.getElementById('weapon').value.trim();
+                    const quantity = document.getElementById('quantity').value.trim();
+                    const recipient = document.getElementById('recipientWeapon').value.trim();
+                    if (weapon !== "" && quantity !== "" && recipient !== "") {
+                        saveTransaction({ type: 'weapon', weapon, quantity, recipient });
+                        document.getElementById('weapon').value = '';
+                        document.getElementById('quantity').value = '';
+                        document.getElementById('recipientWeapon').value = '';
+                    } else {
+                        alert("Por favor, completa todos los campos de arma.");
+                    }
+                });
+            }
+
+            loadTransactions();
+
+            function saveTransaction(transaction) {
+                const user = auth.currentUser;
+                if (user) {
+                    const transactionListRef = ref(database, 'transactions');
+                    const newTransactionRef = push(transactionListRef);
+                    set(newTransactionRef, transaction)
+                        .then(() => console.log('Transacción guardada con éxito'))
+                        .catch((error) => console.error('Error al guardar transacción:', error));
+                } else {
+                    alert('Debe iniciar sesión para guardar transacciones.');
+                }
+            }
+
+            function loadTransactions() {
+                const transactionsRef = ref(database, 'transactions');
+                onValue(transactionsRef, (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        displayTransactions(data);
+                    } else {
+                        displayTransactions({});
+                    }
+                });
+            }
+
+            function displayTransactions(data) {
+                const transactionsList = document.getElementById('transactionsList');
+                if (!transactionsList) return;
+
+                transactionsList.innerHTML = '';
+                for (let id in data) {
+                    const transaction = data[id];
+                    const transactionItem = document.createElement('li');
+                    if (transaction.type === 'payment') {
+                        transactionItem.textContent = `Pago de ${transaction.amount} a ${transaction.recipient}`;
+                    } else if (transaction.type === 'weapon') {
+                        transactionItem.textContent = `Arma: ${transaction.weapon}, Cantidad: ${transaction.quantity}, Destinatario: ${transaction.recipient}`;
+                    }
+
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = 'X';
+                    deleteButton.className = 'delete-button';
+                    deleteButton.addEventListener('click', function () {
+                        deleteTransaction(id);
+                    });
+
+                    transactionItem.appendChild(deleteButton);
+                    transactionsList.appendChild(transactionItem);
+                }
+            }
+
+            function deleteTransaction(id) {
+                const user = auth.currentUser;
+                if (user) {
+                    const transactionRef = ref(database, 'transactions/' + id);
+                    remove(transactionRef)
+                        .then(() => console.log('Transacción eliminada con éxito'))
+                        .catch((error) => console.error('Error al eliminar transacción:', error));
+                } else {
+                    alert('Debe iniciar sesión para eliminar transacciones.');
+                }
+            }
+        });
+    </script>
 </head>
 <body>
-    <div class="container">
-        <h1>Verdugo Crime Family</h1>
-        <div class="menu">
-            <a href="pagos.html" class="menu-link">Registrar Pagos</a>
-            <a href="armas.html" class="menu-link">Registrar Armas</a>
-            <a href="registro.html" class="menu-link">Ver Registro</a>
-        </div>
+    <h1>Registro de Transacciones</h1>
+
+    <div id="authStatus">Logged out</div>
+    <div id="authButtons">
+        <input type="email" id="email" placeholder="Correo electrónico">
+        <input type="password" id="password" placeholder="Contraseña">
+        <button id="registerButton">Registrar</button>
+        <button id="loginButton">Iniciar Sesión</button>
     </div>
+    <button id="logoutButton" style="display:none;">Cerrar Sesión</button>
+
+    <h2>Registrar Pago</h2>
+    <input type="text" id="recipient" placeholder="Destinatario">
+    <input type="text" id="amount" placeholder="Cantidad">
+    <button id="savePaymentButton">Guardar Pago</button>
+
+    <h2>Registrar Arma</h2>
+    <input type="text" id="weapon" placeholder="Arma">
+    <input type="text" id="quantity" placeholder="Cantidad">
+    <input type="text" id="recipientWeapon" placeholder="Destinatario">
+    <button id="saveWeaponButton">Guardar Arma</button>
+
+    <h2>Transacciones Registradas</h2>
+    <ul id="transactionsList"></ul>
 </body>
 </html>
