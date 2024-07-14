@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registro de Transacciones</title>
+    <link rel="stylesheet" href="styles.css"> <!-- Enlace al archivo CSS -->
     <script type="module">
         // Importa las funciones necesarias del SDK de Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
@@ -24,183 +25,133 @@
 
         // Inicializa Firebase
         const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
+        const db = getDatabase(app);
         const auth = getAuth(app);
 
-        document.addEventListener('DOMContentLoaded', function () {
-            const savePaymentButton = document.getElementById('savePaymentButton');
-            const saveWeaponButton = document.getElementById('saveWeaponButton');
-            const registerButton = document.getElementById('registerButton');
-            const loginButton = document.getElementById('loginButton');
-            const logoutButton = document.getElementById('logoutButton');
+        // Referencias a la base de datos
+        const transactionsRef = ref(db, 'transactions');
 
-            registerButton.addEventListener('click', () => {
-                const email = document.getElementById('email').value;
-                const password = document.getElementById('password').value;
-                createUserWithEmailAndPassword(auth, email, password)
-                    .then((userCredential) => {
-                        console.log('User registered:', userCredential.user);
-                    })
-                    .catch((error) => {
-                        console.error('Error registering user:', error);
-                    });
+        // Manejo de envío de transacciones
+        document.getElementById('transactionForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const amount = document.getElementById('amount').value;
+            const recipient = document.getElementById('recipient').value;
+            const transactionId = push(transactionsRef).key;
+            set(ref(db, 'transactions/' + transactionId), {
+                amount: amount,
+                recipient: recipient,
+                user: auth.currentUser.email
             });
+            document.getElementById('amount').value = '';
+            document.getElementById('recipient').value = '';
+        });
 
-            loginButton.addEventListener('click', () => {
-                const email = document.getElementById('email').value;
-                const password = document.getElementById('password').value;
-                signInWithEmailAndPassword(auth, email, password)
-                    .then((userCredential) => {
-                        console.log('User logged in:', userCredential.user);
-                    })
-                    .catch((error) => {
-                        console.error('Error logging in user:', error);
-                    });
+        // Función para mostrar transacciones
+        function displayTransaction(transaction) {
+            const li = document.createElement('li');
+            li.innerText = `${transaction.amount} a ${transaction.recipient} por ${transaction.user}`;
+            if (transaction.user === auth.currentUser.email) {
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'delete-button';
+                deleteButton.innerText = 'Eliminar';
+                deleteButton.addEventListener('click', () => {
+                    remove(ref(db, 'transactions/' + transaction.id));
+                });
+                li.appendChild(deleteButton);
+            }
+            document.getElementById('transactionsList').appendChild(li);
+        }
+
+        // Escucha cambios en las transacciones
+        onValue(transactionsRef, (snapshot) => {
+            const transactionsList = document.getElementById('transactionsList');
+            transactionsList.innerHTML = '';
+            snapshot.forEach((childSnapshot) => {
+                const transaction = childSnapshot.val();
+                transaction.id = childSnapshot.key;
+                displayTransaction(transaction);
             });
+        });
 
-            logoutButton.addEventListener('click', () => {
-                auth.signOut().then(() => {
-                    console.log('User logged out');
+        // Manejo de registro
+        document.getElementById('registerForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            createUserWithEmailAndPassword(auth, email, password)
+                .then((userCredential) => {
+                    console.log('Usuario registrado:', userCredential.user);
+                    document.getElementById('registerEmail').value = '';
+                    document.getElementById('registerPassword').value = '';
+                })
+                .catch((error) => {
+                    console.error('Error al registrar usuario:', error);
                 });
+        });
+
+        // Manejo de inicio de sesión
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            signInWithEmailAndPassword(auth, email, password)
+                .then((userCredential) => {
+                    console.log('Usuario inició sesión:', userCredential.user);
+                    document.getElementById('loginEmail').value = '';
+                    document.getElementById('loginPassword').value = '';
+                })
+                .catch((error) => {
+                    console.error('Error al iniciar sesión:', error);
+                });
+        });
+
+        // Manejo del estado de autenticación
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('authStatus').innerText = `Conectado como ${user.email}`;
+                document.getElementById('transactionForm').style.display = 'block';
+            } else {
+                document.getElementById('authStatus').innerText = 'Desconectado';
+                document.getElementById('transactionForm').style.display = 'none';
+            }
+        });
+
+        // Cierre de sesión
+        document.getElementById('logout').addEventListener('click', () => {
+            auth.signOut().then(() => {
+                console.log('Usuario cerró sesión');
+            }).catch((error) => {
+                console.error('Error al cerrar sesión:', error);
             });
-
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    console.log('User is signed in:', user);
-                    document.getElementById('authStatus').textContent = 'Logged in';
-                    // Show/hide elements based on authentication state
-                    document.getElementById('authButtons').style.display = 'none';
-                    document.getElementById('logoutButton').style.display = 'block';
-                } else {
-                    console.log('No user is signed in');
-                    document.getElementById('authStatus').textContent = 'Logged out';
-                    // Show/hide elements based on authentication state
-                    document.getElementById('authButtons').style.display = 'block';
-                    document.getElementById('logoutButton').style.display = 'none';
-                }
-            });
-
-            if (savePaymentButton) {
-                savePaymentButton.addEventListener('click', function () {
-                    const recipient = document.getElementById('recipient').value.trim();
-                    const amount = document.getElementById('amount').value.trim();
-                    if (recipient !== "" && amount !== "") {
-                        saveTransaction({ type: 'payment', recipient, amount });
-                        document.getElementById('recipient').value = '';
-                        document.getElementById('amount').value = '';
-                    } else {
-                        alert("Por favor, completa todos los campos de pago.");
-                    }
-                });
-            }
-
-            if (saveWeaponButton) {
-                saveWeaponButton.addEventListener('click', function () {
-                    const weapon = document.getElementById('weapon').value.trim();
-                    const quantity = document.getElementById('quantity').value.trim();
-                    const recipient = document.getElementById('recipientWeapon').value.trim();
-                    if (weapon !== "" && quantity !== "" && recipient !== "") {
-                        saveTransaction({ type: 'weapon', weapon, quantity, recipient });
-                        document.getElementById('weapon').value = '';
-                        document.getElementById('quantity').value = '';
-                        document.getElementById('recipientWeapon').value = '';
-                    } else {
-                        alert("Por favor, completa todos los campos de arma.");
-                    }
-                });
-            }
-
-            loadTransactions();
-
-            function saveTransaction(transaction) {
-                const user = auth.currentUser;
-                if (user) {
-                    const transactionListRef = ref(database, 'transactions');
-                    const newTransactionRef = push(transactionListRef);
-                    set(newTransactionRef, transaction)
-                        .then(() => console.log('Transacción guardada con éxito'))
-                        .catch((error) => console.error('Error al guardar transacción:', error));
-                } else {
-                    alert('Debe iniciar sesión para guardar transacciones.');
-                }
-            }
-
-            function loadTransactions() {
-                const transactionsRef = ref(database, 'transactions');
-                onValue(transactionsRef, (snapshot) => {
-                    const data = snapshot.val();
-                    if (data) {
-                        displayTransactions(data);
-                    } else {
-                        displayTransactions({});
-                    }
-                });
-            }
-
-            function displayTransactions(data) {
-                const transactionsList = document.getElementById('transactionsList');
-                if (!transactionsList) return;
-
-                transactionsList.innerHTML = '';
-                for (let id in data) {
-                    const transaction = data[id];
-                    const transactionItem = document.createElement('li');
-                    if (transaction.type === 'payment') {
-                        transactionItem.textContent = `Pago de ${transaction.amount} a ${transaction.recipient}`;
-                    } else if (transaction.type === 'weapon') {
-                        transactionItem.textContent = `Arma: ${transaction.weapon}, Cantidad: ${transaction.quantity}, Destinatario: ${transaction.recipient}`;
-                    }
-
-                    const deleteButton = document.createElement('button');
-                    deleteButton.textContent = 'X';
-                    deleteButton.className = 'delete-button';
-                    deleteButton.addEventListener('click', function () {
-                        deleteTransaction(id);
-                    });
-
-                    transactionItem.appendChild(deleteButton);
-                    transactionsList.appendChild(transactionItem);
-                }
-            }
-
-            function deleteTransaction(id) {
-                const user = auth.currentUser;
-                if (user) {
-                    const transactionRef = ref(database, 'transactions/' + id);
-                    remove(transactionRef)
-                        .then(() => console.log('Transacción eliminada con éxito'))
-                        .catch((error) => console.error('Error al eliminar transacción:', error));
-                } else {
-                    alert('Debe iniciar sesión para eliminar transacciones.');
-                }
-            }
         });
     </script>
 </head>
 <body>
-    <h1>Registro de Transacciones</h1>
-
-    <div id="authStatus">Logged out</div>
-    <div id="authButtons">
-        <input type="email" id="email" placeholder="Correo electrónico">
-        <input type="password" id="password" placeholder="Contraseña">
-        <button id="registerButton">Registrar</button>
-        <button id="loginButton">Iniciar Sesión</button>
+    <div class="container">
+        <h1>Registro de Transacciones</h1>
+        <div id="authStatus">Desconectado</div>
+        <form id="registerForm">
+            <h2>Registrarse</h2>
+            <input type="email" id="registerEmail" placeholder="Correo electrónico" required>
+            <input type="password" id="registerPassword" placeholder="Contraseña" required>
+            <button type="submit">Registrarse</button>
+        </form>
+        <form id="loginForm">
+            <h2>Iniciar Sesión</h2>
+            <input type="email" id="loginEmail" placeholder="Correo electrónico" required>
+            <input type="password" id="loginPassword" placeholder="Contraseña" required>
+            <button type="submit">Iniciar Sesión</button>
+        </form>
+        <form id="transactionForm" style="display:none;">
+            <h2>Registrar Transacción</h2>
+            <div class="transaction-input">
+                <input type="text" id="amount" placeholder="Monto" required>
+                <input type="text" id="recipient" placeholder="Destinatario" required>
+            </div>
+            <button type="submit">Registrar</button>
+        </form>
+        <ul id="transactionsList"></ul>
+        <button id="logout">Cerrar Sesión</button>
     </div>
-    <button id="logoutButton" style="display:none;">Cerrar Sesión</button>
-
-    <h2>Registrar Pago</h2>
-    <input type="text" id="recipient" placeholder="Destinatario">
-    <input type="text" id="amount" placeholder="Cantidad">
-    <button id="savePaymentButton">Guardar Pago</button>
-
-    <h2>Registrar Arma</h2>
-    <input type="text" id="weapon" placeholder="Arma">
-    <input type="text" id="quantity" placeholder="Cantidad">
-    <input type="text" id="recipientWeapon" placeholder="Destinatario">
-    <button id="saveWeaponButton">Guardar Arma</button>
-
-    <h2>Transacciones Registradas</h2>
-    <ul id="transactionsList"></ul>
 </body>
 </html>
