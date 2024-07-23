@@ -3,155 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Transacciones</title>
-    <link rel="stylesheet" href="styles.css"> <!-- Enlace al archivo CSS -->
-    <script type="module">
-        // Importa las funciones necesarias del SDK de Firebase
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
-        import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
-
-        // Configuración de Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyApGshIyzDs65kdUOM8pFC6I3wbRWHdI2g",
-            authDomain: "verdugo-crime-family.firebaseapp.com",
-            databaseURL: "https://verdugo-crime-family-default-rtdb.firebaseio.com",
-            projectId: "verdugo-crime-family",
-            storageBucket: "verdugo-crime-family.appspot.com",
-            messagingSenderId: "998047686059",
-            appId: "1:998047686059:web:7718c1312960c1e6f206ee",
-            measurementId: "G-9VCT40M5DS"
-        };
-
-        // Inicializa Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const auth = getAuth(app);
-
-        // Referencias a la base de datos
-        const transactionsRef = ref(db, 'transactions');
-
-        // Manejo de envío de transacciones
-        document.getElementById('transactionForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const amount = document.getElementById('amount').value;
-            const recipient = document.getElementById('recipient').value;
-            const transactionId = push(transactionsRef).key;
-            set(ref(db, 'transactions/' + transactionId), {
-                amount: amount,
-                recipient: recipient,
-                user: auth.currentUser.email
-            });
-            document.getElementById('amount').value = '';
-            document.getElementById('recipient').value = '';
-        });
-
-        // Función para mostrar transacciones
-        function displayTransaction(transaction) {
-            const li = document.createElement('li');
-            li.innerText = `${transaction.amount} a ${transaction.recipient} por ${transaction.user}`;
-            if (transaction.user === auth.currentUser.email) {
-                const deleteButton = document.createElement('button');
-                deleteButton.className = 'delete-button';
-                deleteButton.innerText = 'Eliminar';
-                deleteButton.addEventListener('click', () => {
-                    remove(ref(db, 'transactions/' + transaction.id));
-                });
-                li.appendChild(deleteButton);
-            }
-            document.getElementById('transactionsList').appendChild(li);
-        }
-
-        // Escucha cambios en las transacciones
-        onValue(transactionsRef, (snapshot) => {
-            const transactionsList = document.getElementById('transactionsList');
-            transactionsList.innerHTML = '';
-            snapshot.forEach((childSnapshot) => {
-                const transaction = childSnapshot.val();
-                transaction.id = childSnapshot.key;
-                displayTransaction(transaction);
-            });
-        });
-
-        // Manejo de registro
-        document.getElementById('registerForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('registerEmail').value;
-            const password = document.getElementById('registerPassword').value;
-            createUserWithEmailAndPassword(auth, email, password)
-                .then((userCredential) => {
-                    console.log('Usuario registrado:', userCredential.user);
-                    document.getElementById('registerEmail').value = '';
-                    document.getElementById('registerPassword').value = '';
-                })
-                .catch((error) => {
-                    console.error('Error al registrar usuario:', error);
-                });
-        });
-
-        // Manejo de inicio de sesión
-        document.getElementById('loginForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-            signInWithEmailAndPassword(auth, email, password)
-                .then((userCredential) => {
-                    console.log('Usuario inició sesión:', userCredential.user);
-                    document.getElementById('loginEmail').value = '';
-                    document.getElementById('loginPassword').value = '';
-                })
-                .catch((error) => {
-                    console.error('Error al iniciar sesión:', error);
-                });
-        });
-
-        // Manejo del estado de autenticación
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                document.getElementById('authStatus').innerText = `Conectado como ${user.email}`;
-                document.getElementById('transactionForm').style.display = 'block';
-            } else {
-                document.getElementById('authStatus').innerText = 'Desconectado';
-                document.getElementById('transactionForm').style.display = 'none';
-            }
-        });
-
-        // Cierre de sesión
-        document.getElementById('logout').addEventListener('click', () => {
-            auth.signOut().then(() => {
-                console.log('Usuario cerró sesión');
-            }).catch((error) => {
-                console.error('Error al cerrar sesión:', error);
-            });
-        });
-    </script>
+    <title>VCF - Inicio</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>Registro de Transacciones</h1>
-        <div id="authStatus">Desconectado</div>
-        <form id="registerForm">
-            <h2>Registrarse</h2>
-            <input type="email" id="registerEmail" placeholder="Correo electrónico" required>
-            <input type="password" id="registerPassword" placeholder="Contraseña" required>
-            <button type="submit">Registrarse</button>
-        </form>
-        <form id="loginForm">
-            <h2>Iniciar Sesión</h2>
-            <input type="email" id="loginEmail" placeholder="Correo electrónico" required>
-            <input type="password" id="loginPassword" placeholder="Contraseña" required>
-            <button type="submit">Iniciar Sesión</button>
-        </form>
-        <form id="transactionForm" style="display:none;">
-            <h2>Registrar Transacción</h2>
-            <div class="transaction-input">
-                <input type="text" id="amount" placeholder="Monto" required>
-                <input type="text" id="recipient" placeholder="Destinatario" required>
-            </div>
-            <button type="submit">Registrar</button>
-        </form>
-        <ul id="transactionsList"></ul>
-        <button id="logout">Cerrar Sesión</button>
+        <h1>Verdugo Crime Family</h1>
+        <div class="menu">
+            <a href="pagos.html" class="menu-link">Registrar Pagos</a>
+            <a href="armas.html" class="menu-link">Registrar Armas</a>
+            <a href="registro.html" class="menu-link">Ver Registro</a>
+        </div>
     </div>
 </body>
 </html>
